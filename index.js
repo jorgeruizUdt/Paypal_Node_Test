@@ -80,10 +80,18 @@ app.get('/pay/:name/:sku/:price/:currency/:quantity', (req, res) => {
       } else {
           console.log(JSON.stringify(payment));
 
-          const url = `http://localhost:5000/success/paymentId=${payment.id}&token=${token}&PayerID=${payment['payer']['payer_info']['payer_id']}`;
-          open(url);
+          const url = `http://localhost:57469/paypal-success/${payment.id}/${token}`;
+          
+          // open(url);
 
-          res.send('Success');
+          res.writeHead(302, {
+            'Location': url
+            //add other headers here...
+          });
+          res.end();
+
+          // res.send('Success');
+          // open(url, "_self");
       }
     });
   });

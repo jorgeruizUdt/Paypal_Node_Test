@@ -1,9 +1,14 @@
 require("dotenv").config();
 
-const express = require('express');
 const paypal = require('paypal-rest-sdk');
+const open = require('open');
+const express = require('express');
 const app = express();
 const PORT = process.env.PORT;
+
+var pr;
+var cr;
+var token;
 
 paypal.configure({
   'mode': 'sandbox', //sandbox or live
@@ -22,6 +27,8 @@ app.get('/pay/:name/:sku/:price/:currency/:quantity', (req, res) => {
     var price = getInfo(req.params.price);
     var currency = getInfo(req.params.currency);
     var quantity = getInfo(req.params.quantity);
+    cr = currency;
+    pr = price;
 
     const create_payment_json = {
       "intent": "sale",
@@ -29,7 +36,7 @@ app.get('/pay/:name/:sku/:price/:currency/:quantity', (req, res) => {
           "payment_method": "paypal"
       },
       "redirect_urls": {
-          "return_url": `http://localhost:3000/success/:${price}/:${currency}`,
+          "return_url": `http://localhost:3000/success`,
           "cancel_url": `http://localhost:3000/cancel`
       },
       "transactions": [{
@@ -50,12 +57,11 @@ app.get('/pay/:name/:sku/:price/:currency/:quantity', (req, res) => {
       }]
   };
 
-  app.get('/success/:price/:currency', (req, res) => {
+  app.get('/success', (req, res) => {
     const payerId = req.query.PayerID;
     const paymentId = req.query.paymentId;
-    var price = req.params.price;
-    var currency = req.params.currency;
-
+    var price = pr;
+    var currency = cr;
   
     const execute_payment_json = {
       "payer_id": payerId,
@@ -74,12 +80,8 @@ app.get('/pay/:name/:sku/:price/:currency/:quantity', (req, res) => {
       } else {
           console.log(JSON.stringify(payment));
 
-          for(let i = 0;i < payment.links.length;i++){
-            if(payment.links[i].rel === 'approval_url'){
-              res.redirect(payment.links[i].href);
-              console.log(`SUCCES: ${payment.links[i].href}`);
-            }
-          }
+          const url = `http://localhost:5000/success/paymentId=${payment.id}&token=${token}&PayerID=${payment['payer']['payer_info']['payer_id']}`;
+          open(url);
 
           res.send('Success');
       }
@@ -92,6 +94,7 @@ app.get('/pay/:name/:sku/:price/:currency/:quantity', (req, res) => {
       } else {
           for(let i = 0;i < payment.links.length;i++){
             if(payment.links[i].rel === 'approval_url'){
+              token = payment.links[i].href.split('token=')[1];
               res.redirect(payment.links[i].href);
               console.log(`fst: ${payment.links[i].href}`);
             }
@@ -128,41 +131,6 @@ app.get('/pay1', (req, res) => {
     }]
 };
 
-app.get('/success/:price/:currency', (req, res) => {
-  const payerId = req.query.PayerID;
-  const paymentId = req.query.paymentId;
-  var price = req.params.price;
-  var currency = req.params.currency;
-
-  const execute_payment_json = {
-    "payer_id": payerId,
-    "transactions": [{
-      "amount": {
-          "currency": currency,
-          "total": price
-      }
-    }]
-  };
-
-  paypal.payment.execute(paymentId, execute_payment_json, function (error, payment) {
-    if (error) {
-      console.log(error.response);
-      throw error;
-    } else {
-      console.log(JSON.stringify(payment));
-
-      for(let i = 0;i < payment.links.length;i++){
-        if(payment.links[i].rel === 'approval_url'){
-          res.redirect(payment.links[i].href);
-          console.log(`SUCCES: ${payment.links[i].href}`);
-        }
-      }
-
-      res.send('Success');
-    }
-  });
-});
-
   app.get('/success1', (req, res) => {
     const payerId = req.query.PayerID;
     const paymentId = req.query.paymentId;
@@ -187,7 +155,7 @@ app.get('/success/:price/:currency', (req, res) => {
       for(let i = 0;i < payment.links.length;i++){
         if(payment.links[i].rel === 'approval_url'){
           res.redirect(payment.links[i].href);
-          console.log(`SUCCES: ${payment.links[i].href}`);
+          console.log(`SUCCES1: ${payment.links[i].href}`);
         }
       }
 

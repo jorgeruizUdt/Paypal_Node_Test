@@ -16,44 +16,53 @@ app.listen(PORT, () => console.log(`Server Started on ${PORT}`));
 
 app.get('/cancel', (req, res) => res.send('Cancelled'));
 
-app.post('/pay', (req, res) => {
+app.get('/pay/:name/:sku/:price/:currency/:quantity', (req, res) => {
+    var name = getInfo(req.params.name);
+    var sku = getInfo(req.params.sku);
+    var price = getInfo(req.params.price);
+    var currency = getInfo(req.params.currency);
+    var quantity = getInfo(req.params.quantity);
+
     const create_payment_json = {
       "intent": "sale",
       "payer": {
           "payment_method": "paypal"
       },
       "redirect_urls": {
-          "return_url": process.env.URL_SUCCESS,
-          "cancel_url": process.env.URL_CANCEL
+          "return_url": `http://localhost:3000/success/:${price}/:${currency}`,
+          "cancel_url": `http://localhost:3000/cancel`
       },
       "transactions": [{
           "item_list": {
               "items": [{
-                  "name": "ARed Sox Hat",
-                  "sku": "0001",
-                  "price": "27.00",
-                  "currency": "USD",
-                  "quantity": 1
+                  "name": name,
+                  "sku": sku,
+                  "price": price,
+                  "currency": currency,
+                  "quantity": parseInt(quantity)
               }]
           },
           "amount": {
-              "currency": "USD",
-              "total": "27.00"
+              "currency": currency,
+              "total": price
           },
           "description": "Hat for the best team ever"
       }]
   };
 
-  app.get('/success', (req, res) => {
+  app.get('/success/:price/:currency', (req, res) => {
     const payerId = req.query.PayerID;
     const paymentId = req.query.paymentId;
+    var price = req.params.price;
+    var currency = req.params.currency;
+
   
     const execute_payment_json = {
       "payer_id": payerId,
       "transactions": [{
           "amount": {
-              "currency": "USD",
-              "total": "27.00"
+              "currency": currency,
+              "total": price
           }
       }]
     };
@@ -64,21 +73,57 @@ app.post('/pay', (req, res) => {
           throw error;
       } else {
           console.log(JSON.stringify(payment));
+
+          for(let i = 0;i < payment.links.length;i++){
+            if(payment.links[i].rel === 'approval_url'){
+              res.redirect(payment.links[i].href);
+              console.log(`SUCCES: ${payment.links[i].href}`);
+            }
+          }
+
           res.send('Success');
       }
     });
   });
 
-    paypal.payment.create(create_payment_json, function (error, payment) {
-        if (error) {
-            throw error;
-        } else {
-            for(let i = 0;i < payment.links.length;i++){
-              if(payment.links[i].rel === 'approval_url'){
-                res.redirect(payment.links[i].href);
-              }
+  paypal.payment.create(create_payment_json, function (error, payment) {
+      if (error) {
+          throw error;
+      } else {
+          for(let i = 0;i < payment.links.length;i++){
+            if(payment.links[i].rel === 'approval_url'){
+              res.redirect(payment.links[i].href);
+              console.log(`fst: ${payment.links[i].href}`);
             }
-        }
-      });
-      
+          }
+      }
+    });   
 });
+
+function parseURLParams(url) {
+  var queryStart = url.indexOf("?") + 1;
+      queryEnd   = url.indexOf("#") + 1 || url.length + 1;
+      query = url.slice(queryStart, queryEnd - 1);
+      pairs = query.replace(/\+/g, " ").split("&");
+      parms = {}, i, n, v, nv;
+
+  if (query === url || query === "") return;
+
+  for (i = 0; i < pairs.length; i++) {
+      nv = pairs[i].split("=", 2);
+      n = decodeURIComponent(nv[0]);
+      v = decodeURIComponent(nv[1]);
+
+      if (!parms.hasOwnProperty(n)) parms[n] = [];
+      parms[n].push(nv.length === 2 ? v : null);
+  }
+
+  return parms;
+}
+
+function getInfo(complete_info) {
+  const splt = complete_info.split('=');
+  const info = splt[1];
+
+  return info;
+}
